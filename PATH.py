@@ -1,0 +1,1 @@
+folder_path = "C:\\Users\\John\\MonkerSolver\\ranges\\Hold'em\\6-way\\1bbAnte 2xOpen\\g.) 8SB 20HJ"
