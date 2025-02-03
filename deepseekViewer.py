@@ -1,21 +1,60 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.widgets import Cursor
-import os
-import PATH
 import glob
-from collections import OrderedDict
+import os
+import math
+from collections import defaultdict
+import PATH
 
-# Folder containing the .rng files
+# Configuration
 folder_path = PATH.folder_path
-file_suffixes = OrderedDict([
-    ("0.rng", "Fold"),
-    ("1.rng", "Call"),
-    ("5.rng", "Min"),
-    ("2.rng", "ALLIN")
-])  # Ordered labeling strategies
+file_suffixes = {"0": "Fold", "1": "Call", "5": "Min", "3": "ALLIN"}
+base_figsize = 5
+colors = {"Fold": "lightblue", "Call": "lightgreen", "Min": "lightcoral", "ALLIN": "red"}
 
-# Define hand order explicitly
+# Get all .rng files and group by node
+all_files = glob.glob(os.path.join(folder_path, "*.rng"))
+node_groups = defaultdict(dict)
+
+for file_path in all_files:
+    filename = os.path.basename(file_path)
+    base_name = filename[:-4]  # Remove .rng extension
+    parts = base_name.split('.')
+    
+    # Skip files that don't follow 0-prefixed structure
+    is_valid = True
+    for p in parts[:-1]:  # Check all parts except the last (action)
+        if p != '0' and len(parts) > 1:  # Allow root node actions
+            is_valid = False
+            break
+            
+    if not is_valid:
+        continue
+
+    # Group valid files
+    if len(parts) == 1:
+        node = "root"
+        suffix = parts[0]
+    else:
+        node = '.'.join(parts[:-1])
+        suffix = parts[-1]
+    
+    if suffix in file_suffixes:
+        node_groups[node][file_suffixes[suffix]] = file_path
+
+# Create subplot grid
+num_nodes = len(node_groups)
+rows = math.ceil(math.sqrt(num_nodes))
+cols = math.ceil(num_nodes / rows)
+fig, axs = plt.subplots(rows, cols, figsize=(base_figsize*cols, base_figsize*rows))
+
+# Flatten axes array
+if num_nodes > 1:
+    axs = axs.flatten()
+else:
+    axs = [axs]
+
+# Define hand order (same as previous)
 hands = [
     "AA", "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
     "AKo", "KK", "KQs", "KJs", "KTs", "K9s", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s",
@@ -30,114 +69,105 @@ hands = [
     "A4o", "K4o", "Q4o", "J4o", "T4o", "94o", "84o", "74o", "64o", "54o", "44", "43s", "42s",
     "A3o", "K3o", "Q3o", "J3o", "T3o", "93o", "83o", "73o", "63o", "53o", "43o", "33", "32s",
     "A2o", "K2o", "Q2o", "J2o", "T2o", "92o", "82o", "72o", "62o", "52o", "42o", "32o", "22"
-]
+]  # Your full hand list here
 
-# Initialize the hand dictionary with ordered hands
-hand_dict = {hand: {} for hand in hands}
-
-# Modified strategy processing section
-for suffix, label in file_suffixes.items():
-    file_path = os.path.join(folder_path, suffix)
-    if os.path.exists(file_path):
-        with open(file_path, "r") as f:
+for ax, (node_name, strategies) in zip(axs, node_groups.items()):
+    # Initialize hand dictionary for this node
+    hand_dict = {hand: {} for hand in hands}
+    
+    # Load data for this node
+    # Modified data loading section
+for ax, (node_name, strategies) in zip(axs, node_groups.items()):
+    # Initialize hand dictionary for this node
+    hand_dict = {hand: {} for hand in hands}
+    
+    # Load data for this node - FIXED INDENTATION
+    for action, file_path in strategies.items():
+        with open(file_path, 'r') as f:
             lines = f.read().strip().split("\n")
-            for i in range(0, len(lines), 2):
-                if i+1 >= len(lines): continue
-                hand = lines[i].strip()
-                strategy, ev = map(float, lines[i + 1].split(";"))
-                #strategy /= 100  # ONLY if your input is percentages (e.g., 30.0 = 30%)
-                ev /= 2000       # Keep your EV scaling
-                if hand in hand_dict:
-                    hand_dict[hand][label] = {"strategy": strategy, "EV": ev}
-
-# Create the 13x13 grid visualization
-fig, ax = plt.subplots(figsize=(6, 6))
-ax.set_xlim(0, 13)
-ax.set_ylim(0, 13)
-ax.set_xticks([])
-ax.set_yticks([])
-ax.set_frame_on(True)
-
-# Colors for different strategies
-colors = {
-    "Fold": "lightblue",
-    "Call": "lightgreen",
-    "Min": "lightcoral",
-    "ALLIN": "gold"
-}
-
-# Define strategy drawing order
-strategy_order = ["Fold", "Call", "Min", "ALLIN"]
-
-# Tooltip storage
-tooltip_texts = {}
-
-for i in range(13):
-    for j in range(13):
-        hand_index = i * 13 + j
-        if hand_index >= len(hands): continue
-        hand = hands[hand_index]
-        strategy_data = hand_dict.get(hand, {})
-        
-        tooltip_texts[(j, 12 - i)] = f"{hand}\n"
-        x_offset = 0  # Start at left edge of cell
-        
-        # Draw strategies
-        for label in strategy_order:
-            if label in strategy_data:
-                data = strategy_data[label]
-                strategy = data["strategy"]
-                ev = data["EV"]
+            line_counter = 0
+            
+            while line_counter < len(lines):
+                hand_line = lines[line_counter].strip()
+                line_counter += 1
                 
-                if strategy > 0:
-                    # Draw strategy segment within cell boundaries
-                    rect = patches.Rectangle(
-                        (j + x_offset, 12 - i),  # X,Y position
-                        width=strategy,          # Width of segment
-                        height=1,                # Full cell height
-                        linewidth=0,
-                        facecolor=colors[label],
-                        alpha=0.7
-                    )
-                    ax.add_patch(rect)
-                    x_offset += strategy  # Accumulate width
+                if not hand_line:
+                    continue
+                    
+                if line_counter >= len(lines):
+                    print(f"⚠️ Missing data line after hand {hand_line} in {file_path}")
+                    break
+                    
+                data_line = lines[line_counter].strip()
+                line_counter += 1
                 
-                tooltip_texts[(j, 12 - i)] += f"{label}: {strategy:.1%} (EV {ev:.2f})\n"
+                parts = data_line.split(";")
+                if len(parts) != 2:
+                    print(f"⚠️ Malformed data line in {file_path}: {data_line}")
+                    continue
+                    
+                try:
+                    strategy, ev = map(float, parts)
+                    ev /= 2000
+                    
+                    if hand_line in hand_dict:
+                        hand_dict[hand_line][action] = {
+                            "strategy": strategy,
+                            "EV": ev
+                        }
+                        
+                except ValueError as e:
+                    print(f"⚠️ Invalid numeric value in {file_path}: {data_line}")
+                    continue
+    
+    # Draw grid for this node - PROPER GRID CREATION
+    ax.set_xlim(0, 13)
+    ax.set_ylim(0, 13)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(f"Node: {node_name}" if node_name != "root" else "Root Node", fontsize=9)
+    
+    # Create 13x13 grid using explicit hand order
+    for row_idx, row_hands in enumerate([
+        hands[i*13:(i+1)*13] for i in range(13)
+    ]):
+        for col_idx, hand in enumerate(row_hands):
+            strategy_data = hand_dict.get(hand, {})
+            x_offset = 0
+            
+            # Draw strategies in defined order
+            for action in ["Fold", "Call", "Min", "ALLIN"]:
+                if action in strategy_data:
+                    data = strategy_data[action]
+                    strategy = data["strategy"]
+                    
+                    if strategy > 0:
+                        rect = patches.Rectangle(
+                            (col_idx + x_offset, 12 - row_idx),  # X,Y position
+                            strategy,                            # Width
+                            1,                                   # Height
+                            linewidth=0,
+                            facecolor=colors[action],
+                            alpha=0.7
+                        )
+                        ax.add_patch(rect)
+                        x_offset += strategy
+            
+            # Add cell outline and label
+            outline_rect = patches.Rectangle(
+                (col_idx, 12 - row_idx), 1, 1,
+                linewidth=0.5,
+                edgecolor="black",
+                facecolor="none"
+            )
+            ax.add_patch(outline_rect)
+            ax.text(col_idx + 0.5, 12 - row_idx + 0.5, hand,
+                    ha='center', va='center',
+                    fontsize=6, weight='bold', alpha=0.7)
 
-        # Add outline and text (keep this unchanged)
-        outline_rect = patches.Rectangle(
-            (j, 12 - i), 1, 1, 
-            linewidth=0.5, 
-            edgecolor="black", 
-            facecolor="none"
-        )
-        ax.add_patch(outline_rect)
-        ax.text(j + 0.5, 12 - i + 0.5, hand, 
-               ha='center', va='center', fontsize=8, weight='bold',
-               #backgroundcolor='white',
-               alpha=0.7)
+# Hide empty subplots
+for ax in axs[len(node_groups):]:
+    ax.axis('off')
 
-# Tooltip setup
-annot = ax.annotate(
-    "", xy=(0,0), 
-    xytext=(10,10), 
-    textcoords="offset points",
-    bbox=dict(boxstyle="round", fc="white", alpha=0.9),
-    arrowprops=dict(arrowstyle="->")
-)
-annot.set_visible(False)
-
-def update_tooltip(event):
-    if event.inaxes == ax:
-        x, y = int(event.xdata), int(event.ydata)
-        if (x, y) in tooltip_texts:
-            annot.set_text(tooltip_texts[(x, y)])
-            annot.xy = (x + 0.5, y + 0.5)
-            annot.set_visible(True)
-            fig.canvas.draw_idle()
-        else:
-            annot.set_visible(False)
-            fig.canvas.draw_idle()
-
-fig.canvas.mpl_connect("motion_notify_event", update_tooltip)
+plt.tight_layout()
 plt.show()
