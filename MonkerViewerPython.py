@@ -3,11 +3,17 @@ import matplotlib.patches as patches
 from matplotlib.widgets import Cursor
 import os
 import PATH
+import glob
 
 # Folder containing the .rng files
 folder_path = PATH.folder_path
 file_suffixes = {"0.rng": "Fold", "5.rng": "Min", "2.rng": "ALLIN", "1.rng": "Call"}  # Labeling strategies
 file_paths = {suffix: os.path.join(folder_path, suffix) for suffix in file_suffixes}
+files = glob.glob(folder_path + '/*.rng') #this includes the basename
+
+for file in files:
+    filename = os.path.basename(file)
+    print(filename)
 
 # Initialize the hand dictionary
 hand_dict = {hand: {} for hand in [
@@ -39,7 +45,7 @@ for file, label in file_suffixes.items():
                     hand_dict[hand][label] = {"strategy": strategy, "EV": ev}
 
 # Create the 13x13 grid visualization
-fig, ax = plt.subplots(figsize=(8, 8))
+fig, ax = plt.subplots(figsize=(6, 6))
 ax.set_xlim(0, 13)
 ax.set_ylim(0, 13)
 ax.set_xticks([])
