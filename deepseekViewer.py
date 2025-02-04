@@ -44,7 +44,6 @@ for file_path in all_files:
         if p != '0' and len(parts) > 1:  # Allow root node actions
             is_valid = False
             break
-            
     if not is_valid:
         continue
 
@@ -92,32 +91,25 @@ for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
             while line_counter < len(lines):
                 hand_line = lines[line_counter].strip()
                 line_counter += 1
-                
                 if not hand_line:
                     continue
-                    
                 if line_counter >= len(lines):
                     print(f"⚠️ Missing data line after hand {hand_line} in {file_path}")
                     break
-                    
                 data_line = lines[line_counter].strip()
                 line_counter += 1
-                
                 parts = data_line.split(";")
                 if len(parts) != 2:
                     print(f"⚠️ Malformed data line in {file_path}: {data_line}")
                     continue
-                    
                 try:
                     strategy, ev = map(float, parts)
                     ev /= 2000
-                    
                     if hand_line in hand_dict:
                         hand_dict[hand_line][action] = {
                             "strategy": strategy,
                             "EV": ev
                         }
-                        
                 except ValueError as e:
                     print(f"⚠️ Invalid numeric value in {file_path}: {data_line}")
                     continue
