@@ -5,18 +5,19 @@ import os
 import math
 from collections import defaultdict
 import PATH
+import json
 
-# Configuration
-folder_path = PATH.folder_path
-file_suffixes = {"0": "Fold", "1": "Call", "5": "Min", "3": "ALLIN"}
-base_figsize = 3
-colors = {"Fold": "lightblue", "Call": "lightgreen", "Min": "lightcoral", "ALLIN": "red"}
+def is_json(text):
+  try:
+    json.loads(text)
+    return True
+  except json.JSONDecodeError:
+    return False
+  
+class mydict(dict):
+    def __str__(self):
+        return json.dumps(self)
 
-# Get all .rng files and group by node
-all_files = glob.glob(os.path.join(folder_path, "*.rng"))
-node_groups = defaultdict(dict)
-
-# Define hand order (same as previous)
 hands = [
     "AA", "AKs", "AQs", "AJs", "ATs", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s",
     "AKo", "KK", "KQs", "KJs", "KTs", "K9s", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s",
@@ -33,31 +34,44 @@ hands = [
     "A2o", "K2o", "Q2o", "J2o", "T2o", "92o", "82o", "72o", "62o", "52o", "42o", "32o", "22"
 ]  # Your full hand list here
 
+# Configuration
+folder_path = PATH.folder_path
+file_suffixes = {"0": "Fold", "1": "Call", "5": "Min", "3": "ALLIN", "4": "Raise"}
+base_figsize = 3
+colors = {"Fold": "lightblue", "Call": "lightgreen", "Min": "lightcoral", "ALLIN": "red"}
+
+# Get all .rng files and group by node
+all_files = glob.glob(os.path.join(folder_path, "*.rng"))
+node_groups = defaultdict(dict)
+#print(all_files) #literally all files in the folder
+
 for file_path in all_files:
     filename = os.path.basename(file_path)
     base_name = filename[:-4]  # Remove .rng extension
-    parts = base_name.split('.')
-    
+    rng_file_parts = base_name.split('.')
     # Skip files that don't follow 0-prefixed structure
     is_valid = True
-    for p in parts[:-1]:  # Check all parts except the last (action)
-        if p != '0' and len(parts) > 1:  # Allow root node actions
+    for p in rng_file_parts[:-1]:  # Check all rng_file_parts except the last (action)
+        if p != '0' and len(rng_file_parts) > 1:  # Allow root node actions
             is_valid = False
             break
     if not is_valid:
         continue
 
     # Group valid files
-    if len(parts) == 1:
-        node = "root"
-        suffix = parts[0]
+    if len(rng_file_parts) == 1:
+        node_name = "root"
+        suffix = rng_file_parts[0]
     else:
-        node = '.'.join(parts[:-1])
-        suffix = parts[-1]
+        node_name = '.'.join(rng_file_parts[:-1])
+        suffix = rng_file_parts[-1]
     
     if suffix in file_suffixes:
-        node_groups[node][file_suffixes[suffix]] = file_path
+        node_groups[node_name][file_suffixes[suffix]] = file_path
 
+print(node_groups)
+#json_node = mydict(node_groups)
+#print(is_json(str(json_node)))
 # Create subplot grid
 num_nodes = len(node_groups)
 rows = math.ceil(math.sqrt(num_nodes))
@@ -78,9 +92,11 @@ else:
 
 # Process nodes in reverse order
 reversed_nodes = list(node_groups.items())[::-1]
+#print(reversed_nodes)
+#print(is_json(str(node_groups)))
 for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
     ax = axs[ax_idx]
-    hand_dict = {hand: {} for hand in hands}
+    node_dict = {hand: {} for hand in hands}
     
     # Load data and precompute tooltips
     for action, file_path in strategies.items():
@@ -93,23 +109,22 @@ for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
                 line_counter += 1
                 if not hand_line:
                     continue
-                if line_counter >= len(lines):
-                    print(f"⚠️ Missing data line after hand {hand_line} in {file_path}")
-                    break
                 data_line = lines[line_counter].strip()
                 line_counter += 1
-                parts = data_line.split(";")
-                if len(parts) != 2:
+                rng_file_parts = data_line.split(";")
+                if len(rng_file_parts) != 2:
                     print(f"⚠️ Malformed data line in {file_path}: {data_line}")
                     continue
                 try:
-                    strategy, ev = map(float, parts)
-                    ev /= 2000
-                    if hand_line in hand_dict:
-                        hand_dict[hand_line][action] = {
+                    strategy, nonRoundEv = map(float, rng_file_parts)
+                    nonRoundEv /= 2000
+                    ev = round(nonRoundEv, 2)
+                    if hand_line in node_dict:
+                        node_dict[hand_line][action] = {
                             "strategy": strategy,
                             "EV": ev
                         }
+                    #print(node_dict) #this has '32o' and all 3 actions for it with both the strategy and ev
                 except ValueError as e:
                     print(f"⚠️ Invalid numeric value in {file_path}: {data_line}")
                     continue
@@ -121,7 +136,7 @@ for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
             if hand_index >= len(hands):
                 continue
             hand = hands[hand_index]
-            strategy_data = hand_dict.get(hand, {})
+            strategy_data = node_dict.get(hand, {})
             
             # Build tooltip
             tooltip = f"{hand}\n"
@@ -147,7 +162,7 @@ for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
             if hand_index >= len(hands):
                 continue
             hand = hands[hand_index]
-            strategy_data = hand_dict.get(hand, {})
+            strategy_data = node_dict.get(hand, {})
             x_offset = 0
 
             # Build tooltip FIRST
