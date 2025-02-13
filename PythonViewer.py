@@ -43,7 +43,6 @@ colors = {"Fold": "lightblue", "Call": "lightgreen", "Min": "lightcoral", "ALLIN
 # Get all .rng files and group by node
 all_files = glob.glob(os.path.join(folder_path, "*.rng"))
 node_groups = defaultdict(dict)
-#print(all_files) #literally all files in the folder
 
 for file_path in all_files:
     filename = os.path.basename(file_path)
@@ -68,10 +67,10 @@ for file_path in all_files:
     
     if suffix in file_suffixes:
         node_groups[node_name][file_suffixes[suffix]] = file_path
+        base_file_path = os.path.basename(file_path)
+        ss_file_path, ext = os.path.splitext(base_file_path)
 
-print(node_groups)
-#json_node = mydict(node_groups)
-#print(is_json(str(json_node)))
+json_node = mydict(node_groups)
 # Create subplot grid
 num_nodes = len(node_groups)
 rows = math.ceil(math.sqrt(num_nodes))
@@ -92,8 +91,6 @@ else:
 
 # Process nodes in reverse order
 reversed_nodes = list(node_groups.items())[::-1]
-#print(reversed_nodes)
-#print(is_json(str(node_groups)))
 for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
     ax = axs[ax_idx]
     node_dict = {hand: {} for hand in hands}
@@ -124,7 +121,6 @@ for ax_idx, (node_name, strategies) in enumerate(reversed_nodes):
                             "strategy": strategy,
                             "EV": ev
                         }
-                    #print(node_dict) #this has '32o' and all 3 actions for it with both the strategy and ev
                 except ValueError as e:
                     print(f"⚠️ Invalid numeric value in {file_path}: {data_line}")
                     continue
