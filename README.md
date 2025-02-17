@@ -31,7 +31,7 @@ This Python project is designed to visualize poker strategies from `.rng` files.
 
 2. Install the required libraries:
    ```bash
-   pip install matplotlib
+   pip install -r requirements.txt
 
 ## Usage
 
