@@ -1,1 +1,2 @@
-folder_path = "C:\\Users\\John\\MonkerSolver\\ranges\\Hold'em\\6-way\\1bbAnte_2xOpen\\25LJ_11HJ_25CO_25BTN_15SB_25BB"
+#folder_path = "C:\\Users\\John\\MonkerSolver\\ranges\\Hold'em\\6-way\\1bbAnte_2xOpen\\25LJ_8HJ_25CO_25BTN_20SB_25BB"
+folder_path = "C:\\Users\\John\\MonkerSolver\\ranges\\Hold'em\\8-way\\8UTG_8UTG+1_8LJ_8HJ_8CO_8BTN_8SB_8BB"
