@@ -2,6 +2,8 @@ import os
 import PATH
 import json
 import glob
+from tkinter import Tk
+from tkinter.filedialog import askdirectory
 
 def is_json(text):
   try:
@@ -20,6 +22,10 @@ def number_to_action(number):
       return "Min"
    elif number == '15':
       return "Raise 2bb"
+   elif number == '14':
+      return "Raise 1.5bb"
+   elif number == '21':
+      return "Raise 5bb"
    elif number.startswith("40"):
       percentage = number[3:]
       return f"Raise {percentage}%"
@@ -44,11 +50,15 @@ def name_node(node):
    else:
       return 'root'
 def parse_position_bb(s: str):
-    digits = ''.join(c for c in s if c.isdigit())
-    letters = ''.join(c for c in s if c.isalpha())
-    if not digits or not letters:
+    i = 0
+    while i < len(s) and s[i].isdigit():
+        i += 1
+    if i == 0 or i == len(s):
         raise ValueError(f"Invalid format: {s}")
-    return letters, int(digits)
+    bb_val = int(s[:i])
+    pos = s[i:]
+    pos = ''.join(ch for ch in pos if ch.isalnum())
+    return pos, bb_val
 def get_active_player(node, players):
     active_indices = [
         i for i in range(len(players))
@@ -64,16 +74,19 @@ def get_active_player(node, players):
     try:
         pos = active_indices.index(last_active_index)
     except ValueError:
-        # This should not happen since last_active_index must be active.
         pos = -1
     next_active_index = active_indices[(pos + 1) % len(active_indices)]
     return players[next_active_index].lstrip("0123456789")
 
-        
+
+folder_path = askdirectory(title='Select Folder') # shows dialog box and return the path
+print(folder_path)
+#folder_path = PATH.folder_path
+all_files = glob.glob(os.path.join(folder_path, "*.rng"))
+
 raise_size = 0
 number_converter = {0: "Fold", 1: "Call", 5: "Min", 3: "ALLIN", 4: "Raise "+str(raise_size)+"%", 2: "Raise X"} #5.0.0.0.40075.0 meant raise 75% pot
-folder_path = PATH.folder_path
-all_files = glob.glob(os.path.join(folder_path, "*.rng"))
+
 
 
 output_dir = os.path.basename(folder_path)
@@ -115,7 +128,8 @@ for file_path in all_files:
          if node_count[name_node(node)] == 0:
             file.write('{"Position":' + json.dumps(get_active_player(list(map(int, node)), players))+',"bb":'+str(bb)+",")
          file.write('"'+str(number_to_action(action))+'"'+":"+str(json.dumps(rngtodict(file_path)))+ ',')
-
+print('entering node list')
+print('output directory: ' + output_dir)
 for node in node_list:
    with open(os.path.join('C:\PythonStuff\MonkerPythonGUI\\'+output_dir,name_node(node)+'.json'),'r') as file:
       data = file.read()[:-1]
@@ -124,3 +138,4 @@ for node in node_list:
       if is_json(data+"}") == False:
          print(str(node)+' is false')
          break
+print("RNGtoJSON Complete.")

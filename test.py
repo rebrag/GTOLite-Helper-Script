@@ -48,7 +48,7 @@ outer = {}
 outer['polly'] = empty
 print(outer)
 
-
-print(is_json(str(json.dumps(outer))))
-with open(os.path.join('C:\PythonStuff\MonkerPythonGUI\\test','testtest.txt'),'a') as file:
-      file.write(str(json.dumps(outer))+'\n')
+print(len(h))
+# print(is_json(str(json.dumps(outer))))
+# with open(os.path.join('C:\PythonStuff\MonkerPythonGUI\\test','testtest.txt'),'a') as file:
+#       file.write(str(json.dumps(outer))+'\n')
