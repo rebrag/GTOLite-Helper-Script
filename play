@@ -1,0 +1,11 @@
+candies = [12,1,12]
+extraCandies = 10
+output = []
+for i in range(len(candies)):
+    print(candies[i], candies[i]+3)
+    if candies[i]+3 >= max(candies): 
+        output.append(True)
+    else:
+        output.append(False)
+
+print(output)
