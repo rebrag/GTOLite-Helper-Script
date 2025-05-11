@@ -26,6 +26,12 @@ def number_to_action(number):
         return "Raise 2bb"
     elif number == '14':
         return "Raise 1.5bb"
+    elif number == '15':
+        return "Raise 2bb"
+    elif number == '16':
+        return "Raise 2.5bb"
+    elif number == '18':
+        return "Raise 3.5bb"
     elif number == '19':
         return "Raise 4bb"
     elif number == '21':
@@ -137,9 +143,12 @@ for file_path in all_files:
     num_players = len(players)
     line = os.path.basename(file_path[:-4]).split(".")
     node = line[:-1]  # list of actions as strings
+
     # Determine the position and big blind based on the next player's data.
-    positionS = players[len(node) % len(players)]
-    position, bb = parse_position_bb(positionS)
+    position_to_bb = dict(parse_position_bb(p) for p in players)
+    active_player = get_active_player(list(map(int, node)), players)
+    bb = position_to_bb.get(active_player, 0)
+
     # Update node count (used for determining file header writes).
     if name_node(node) in node_count.keys():
         node_count[name_node(node)] += 1
