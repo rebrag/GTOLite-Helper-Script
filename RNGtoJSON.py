@@ -1,11 +1,10 @@
-import os
+import os, time
 import json
 import glob
 import re
 import threading
 from typing import Dict, List, Tuple, Any
-
-# Tkinter is used only for the "choose folder" dialog
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tkinter import Tk
 from tkinter.filedialog import askdirectory
 
@@ -19,11 +18,19 @@ def is_json(text: str) -> bool:
         return True
     except json.JSONDecodeError:
         return False
-
+    
+# ──────────────────────────────────────────────────
+# Progress-aware, timed converter
+# ──────────────────────────────────────────────────
+def _parse_rng_file(file_path: str) -> tuple[str, str, dict]:
+    parts = os.path.basename(file_path[:-4]).split(".")
+    node, action_code = parts[:-1], parts[-1]
+    node_key = name_node(node)
+    return node_key, number_to_action(action_code), rng_to_dict(file_path)
 
 def number_to_action(number: str) -> str:
     """
-    Translate Monker‐style numeric codes into readable actions.
+    Translate Monker-style numeric codes into readable actions.
     Extend the dictionary below if you meet new codes.
     """
     mapping = {
@@ -37,13 +44,17 @@ def number_to_action(number: str) -> str:
         "18": "Raise 3.5bb",
         "19": "Raise 4bb",
         "21": "Raise 5bb",
+        "22": "Raise 5.5bb",
+        "23": "Raise 6bb",
+        "24": "Raise 6.5bb",
+        "28": "Raise 8.5bb",
     }
 
     if number in mapping:
         return mapping[number]
     if number.startswith("40"):
         # Monker convention: 40075 → raise 75 % pot
-        percent = number[3:]
+        percent = int(number[2:])  
         return f"Raise {percent}%"
     # Fallback: keep the raw code
     return number
@@ -106,57 +117,69 @@ def get_active_player(node: List[int], players: List[str]) -> str:
 # ────────────────────────────────────────────
 # Worker thread: heavy lifting
 # ────────────────────────────────────────────
-def convert_rng_folder(folder_path: str, output_dir: str) -> None:
-    """
-    Convert every *.rng file in `folder_path` into per‑node JSON files
-    under `output_dir`.
-    """
-    all_files = glob.glob(os.path.join(folder_path, "*.rng"))
-    if not all_files:
-        print("No .rng files found.")
-        return
+def convert_rng_folder(folder_path: str,
+                       output_dir: str,
+                       workers: int = 8) -> None:
 
+    start = time.perf_counter()
+
+    files: List[str] = glob.glob(os.path.join(folder_path, "*.rng"))
+    if not files:
+        print("No .rng files found."); return
+    total = len(files)
+
+    # ---------- choose progress backend ----------
+    try:
+        from tqdm import tqdm          # type: ignore
+        progress = tqdm(total=total, unit="file", desc="Parsing")
+        def tick(n=1): progress.update(n)
+    except ModuleNotFoundError:
+        processed = 0
+        def tick(n=1):
+            nonlocal processed
+            processed += n
+            pct = processed * 100 // total
+            print(f"\rParsing: {processed}/{total} ({pct:3d}%)", end="", flush=True)
+
+    # ---------- parallel read & parse ------------
+    node_data: Dict[str, Dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_parse_rng_file, fp) for fp in files]
+        for fut in as_completed(futures):
+            node_key, act_name, data = fut.result()
+            node_data.setdefault(node_key, {})[act_name] = data
+            tick()
+
+    if 'progress' in locals(): progress.close()
+    else: print()            # finish the in-place line
+
+    # ---------- add Position / bb ----------------
     players = os.path.basename(folder_path).split("_")
     pos_to_bb = dict(parse_position_bb(p) for p in players)
 
-    node_list: List[List[str]] = []
-    node_count: Dict[str, int] = {}
+    for node_key in node_data:
+        node_parts = node_key.split(".") if node_key != "root" else []
+        active = get_active_player(list(map(int, node_parts)), players)
+        node_data[node_key] = {
+            "Position": active,
+            "bb": pos_to_bb.get(active, 0.0),
+            **node_data[node_key],
+        }
 
-    for file_path in all_files:
-        parts = os.path.basename(file_path[:-4]).split(".")
-        node, action_code = parts[:-1], parts[-1]
-        node_key = name_node(node)
+    # ---------- single write per node ------------
+    os.makedirs(output_dir, exist_ok=True)
+    for node_key, payload in node_data.items():
+        out_path = os.path.join(output_dir, f"{node_key}.json")
+        try:
+            import orjson as _json      # type: ignore # fastest if available
+            with open(out_path, "wb") as f:
+                f.write(_json.dumps(payload, option=_json.OPT_INDENT_2))
+        except ModuleNotFoundError:
+            with open(out_path, "w") as f:
+                json.dump(payload, f, indent=2)
 
-        node_count[node_key] = node_count.get(node_key, 0) + 1
-        if node not in node_list:
-            node_list.append(node)
-
-        active_player = get_active_player(list(map(int, node)), players)
-        bb_val = pos_to_bb.get(active_player, 0.0)
-
-        json_file = os.path.join(output_dir, f"{node_key}.json")
-        with open(json_file, "a") as jf:
-            # first write for this node → open a JSON object
-            if node_count[node_key] == 1:
-                jf.write(
-                    '{"Position":' + json.dumps(active_player) +
-                    ',"bb":' + str(bb_val) + ','
-                )
-            jf.write(
-                '"' + number_to_action(action_code) + '":' +
-                json.dumps(rng_to_dict(file_path)) + ','
-            )
-
-    # Close the dangling commas at the end of each file
-    for node in node_list:
-        json_path = os.path.join(output_dir, f"{name_node(node)}.json")
-        with open(json_path, "r+") as jf:
-            content = jf.read().rstrip(",") + "}"
-            jf.seek(0)
-            jf.write(content)
-            jf.truncate()
-
-    print("RNG → JSON conversion complete.")
+    elapsed = time.perf_counter() - start
+    print(f"✅ Converted {total} files into {len(node_data)} nodes in {elapsed:.1f} s.")
 
 
 # ────────────────────────────────────────────
