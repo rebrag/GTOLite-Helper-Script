@@ -87,19 +87,10 @@ def _parse_rng_file(file_path: str) -> tuple[str, str, dict]:
     """
     Helper for parallel processing. This function is now simplified and robust.
     """
-    # Get filename without extension, e.g., "5.1.17"
     file_name_no_ext = os.path.basename(file_path)[:-4]
-    
-    # Split the name into parts based on the dot separator
     node_parts = file_name_no_ext.split(".")
-    
-    # The last part is the action code (e.g., "17")
     action_code = node_parts[-1]
-    
-    # Everything before the last part forms the node path (e.g., ["5", "1"])
     node_path_list = node_parts[:-1]
-    
-    # Convert the path list into a single key string (e.g., "5.1")
     node_key = name_node(node_path_list)
     
     # Return the node key, the RAW action code, and the file data
